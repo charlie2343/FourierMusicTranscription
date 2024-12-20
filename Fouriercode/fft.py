@@ -1,6 +1,9 @@
 import cmath
+import time
+from scipy.io.wavfile import read
 
-audio = [0,1,2,3,4,5,6,7]
+#audio = [0,1,2,3,4,5,6,7]
+SAMPLING_RATE, audio = read("mhll.wav")
 
 def fft(): 
     split_data = []
@@ -18,6 +21,7 @@ def fft():
 
 
 def DFT(window): 
+    start = time.time()
     numSamp = len(window)
     DFT_result = {}
     # Loop through frequencies up to Nyquist
@@ -28,6 +32,8 @@ def DFT(window):
             # Use cmath.exp for complex exponential
             coefficient += window[sample] * cmath.exp(-2j * cmath.pi * freq / numSamp * sample)
         DFT_result[freq] = coefficient
+    end = time.time()
+    print(f"Elapsed time: {start-end}")
     return DFT_result
 
 def FFTtest(window): 
@@ -56,4 +62,4 @@ def pairFreq():
     secondhalf = sdf
 
 print(DFT(audio))
-print(FFTtest([[0,1,2,3],[4,5,6,7]]))
+

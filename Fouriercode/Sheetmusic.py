@@ -94,6 +94,7 @@ def getnotes():
         if np.abs(freq_cur - freq_nxt) <= resolution:
             if amp_cur > 100: 
                 count += 1
+        # ! detects when new note, or if same note repeated it splits by less amplitude frame
         elif count != 0 or amp_cur< 210:
             print(f" \n Frequency: {freq_cur:.2f} Hz gone, Amplitude: {amp_cur:.2f}, Count: {count}")
             length = get_duration(count)
@@ -117,7 +118,7 @@ def get_duration(count):
     min = 10
     closestnote = ""
     durations = {}
-    time = count * (23423/48000)
+    time = count * time_interval
     durations["whole"] = 60/BPM * 4
     durations["half"] = durations["whole"] /2 
     durations["quarter"] = durations["whole"]/4
@@ -205,14 +206,97 @@ getnotes()
 #Spectrogram(Zxx_filtered)
 #print(score)
 
+
 print(score)
-Music = makesheetmusic(score)
-name = input("Enter file name (without extension): ").strip()  # Remove extra spaces
 
-# Create the full output path
+#!!Music 21 stuff
+# Music = makesheetmusic(score)
+# name = input("Enter file name (without extension): ").strip()  # Remove extra spaces
 
-output_path = os.path.expanduser(f'~/Fourier/scores/{name}')  # Expand `~` to the home directory
-Music.write('musicxml', fp=output_path)
-print(f"MusicXML file saved to {output_path}")
+# # Create the full output path
+
+# output_path = os.path.expanduser(f'~/Fourier/scores/{name}')  # Expand `~` to the home directory
+# Music.write('musicxml', fp=output_path)
+# print(f"MusicXML file saved to {output_path}")
 
 
+##? Find clef code
+            
+def findDistance(note1, note2): 
+    distance = 0
+    #*not accounting for # or flats
+    n1_letter_val  = ord(note1[0])
+    n1_octave  = int(note1[1])
+    n2_letter_val  = ord(note2[0])
+    n2_octave  = int(note2[1])
+    
+    distance = np.abs(n1_letter_val - n2_letter_val) + 8 * np.abs(n1_octave - n2_octave)
+    
+    
+    # print("Letter B: ", n1_letter_val, " Octave: ", n1_octave)
+    # print("Letter C: ", n2_letter_val, " Octave: ", n2_octave)
+    # print("Distance: ", distance)
+    return distance
+
+def findClef(score): 
+    clefs = {
+        "treble": "B5",
+        "bass": "D3",
+        "alto": "C4"
+    }
+    measure = 0
+    min = 9999999999999
+    closestClef = ""
+    for clef in clefs: 
+        middlenote = clefs[clef]
+        for data in score:
+            distance = findDistance(data[1], middlenote)
+            #* emphasize close notes more
+            measure += math.exp(distance)
+        
+        if measure <= min: 
+            min = measure
+            closestClef = clef
+    return closestClef
+
+
+def findKeySignature(): 
+    keySignatures = { 
+        # Key Signatures in the Treble Clef
+        "C Major": ["C", "D", "E", "F", "G", "A", "B"],  # No sharps or flats
+        "G Major": ["G", "A", "B", "C", "D", "E", "F#"],  # One sharp (F#)
+        "D Major": ["D", "E", "F#", "G", "A", "B", "C#"],  # Two sharps (F#, C#)
+        "A Major": ["A", "B", "C#", "D", "E", "F#", "G#"],  # Three sharps (F#, C#, G#)
+        "E Major": ["E", "F#", "G#", "A", "B", "C#", "D#"],  # Four sharps (F#, C#, G#, D#)
+        "B Major": ["B", "C#", "D#", "E", "F#", "G#", "A#"],  # Five sharps (F#, C#, G#, D#, A#)
+        "F# Major": ["F#", "G#", "A#", "B", "C#", "D#", "E#"],  # Six sharps (F#, C#, G#, D#, A#, E#)
+        "C# Major": ["C#", "D#", "E#", "F#", "G#", "A#", "B#"],  # Seven sharps (F#, C#, G#, D#, A#, E#, B#)
+        "F Major": ["F", "G", "A", "Bb", "C", "D", "E"],  # One flat (Bb)
+        "Bb Major": ["Bb", "C", "D", "Eb", "F", "G", "A"],  # Two flats (Bb, Eb)
+        "Eb Major": ["Eb", "F", "G", "Ab", "Bb", "C", "D"],  # Three flats (Bb, Eb, Ab)
+        "Ab Major": ["Ab", "Bb", "C", "Db", "Eb", "F", "G"],  # Four flats (Bb, Eb, Ab, Db)
+        "Db Major": ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"],  # Five flats (Bb, Eb, Ab, Db, Gb)
+        "Gb Major": ["Gb", "Ab", "Bb", "Cb", "Db", "Eb", "F"],  # Six flats (Bb, Eb, Ab, Db, Gb, Cb)
+        "Cb Major": ["Cb", "Db", "Eb", "Fb", "Gb", "Ab", "Bb"],  # Seven flats (Bb, Eb, Ab, Db, Gb, Cb, Fb
+                     }
+    
+    for key_sig in keySignatures:
+        count = 0
+        min = 999
+        bestKey = ""
+        for data in score: 
+            note = data[1]
+            note_name = note[0]
+            #print(note_name)
+            if note_name not in keySignatures[key_sig]: 
+                count += 1 
+        if count <= min: 
+            bestKey = key_sig
+        
+    return bestKey
+                                                                                                         
+print("Closest Clef: ", findClef(score))
+print("Key Signature: ", findKeySignature())
+
+
+            
