@@ -32,12 +32,12 @@ print("Sampling rate:", SAMPLING_RATE)
 
 
 # Convert BPM to approximate number of samples per beat
-time_interval = (60 / BPM) / 8 
+time_interval = 0.0625
 #32nd note length
 sample_count = time_interval * SAMPLING_RATE
 resolution = 1/time_interval
 # Ensure window size is appropriate (e.g., capped at 512 samples)
-# sample_count = min(sample_count,5000)
+sample_count = 4000
 print(resolution)
 print(f"sample count: {sample_count}")
 window = get_window("triang", sample_count)
@@ -45,7 +45,7 @@ print("Window type: ", type(window), " Window values: ", window)
 
 
 # Adjust STFT to scale frequency range to 0 - 1000 Hz
-def short_time_fourier_transform(signal, overlap=0.5):  # Get the window for the STFT
+def short_time_fourier_transform(signal, overlap=0.25):  # Get the window for the STFT
     nperseg = len(window)
     noverlap = int(overlap * nperseg)
     f, t, Zxx = stft(signal, SAMPLING_RATE, window=window, nperseg=nperseg, noverlap=noverlap)
@@ -75,7 +75,6 @@ def getnotes():
         freq_cur = frequencies[top_indices_cur[1]]
         amp_cur = time_amplitudes_cur[top_indices_cur[1]]
         freq_nxt = frequencies[top_indices_nxt[1]]
-        print(f"Time: {time:.2f}s")
         # ! prints indicies of top two freqs
         #print(f"Top indices (current): {top_indices_cur}, Top indices (next): {top_indices_nxt}")
         #  ! prints frequencies of top two
@@ -84,6 +83,7 @@ def getnotes():
         # print(f"Amplitudes (current): {time_amplitudes_cur[top_indices_cur]}"
 
         # !prints the top four amplitudes
+        print(f"Time: {time:.2f}s")
         top_indices = np.argsort(time_amplitudes_cur)[-4:]  # Get indices of top 4 amplitudes
         for idx in reversed(top_indices):  # Reverse to show the largest first
             print(f"  Frequency: {frequencies[idx]:.2f} Hz, Amplitude: {time_amplitudes_cur[idx]:.2f}")
@@ -91,18 +91,25 @@ def getnotes():
         # ! if in consecutively in top 2 frequencies count increase
         # ! If not, get duration of the frequency, compare it to closest note, and append to list  
         #if freq_cur in frequencies[top_indices_nxt]:
-        if np.abs(freq_cur - freq_nxt) <= resolution:
-            if amp_cur > 100: 
-                count += 1
-        # ! detects when new note, or if same note repeated it splits by less amplitude frame
-        elif count != 0 or amp_cur< 210:
-            print(f" \n Frequency: {freq_cur:.2f} Hz gone, Amplitude: {amp_cur:.2f}, Count: {count}")
+        if amp_cur< 210:
+            count +=1 
             length = get_duration(count)
-            note = comparenotes(freq_cur)
+            note = "rest"
+        else:
             score.append((freq_cur,note,length,time))
-            count = 0
-        else: 
-            pass
+            count = 0    
+            if np.abs(freq_cur - freq_nxt) <= resolution:
+                if amp_cur > 100: 
+                    count += 1
+            # ! detects when new note, or if same note repeated it splits by less amplitude frame
+            elif count != 0:
+                print(f" \n Frequency: {freq_cur:.2f} Hz gone, Amplitude: {amp_cur:.2f}, Count: {count}")
+                length = get_duration(count)
+                note = comparenotes(freq_cur)
+                score.append((freq_cur,note,length,time))
+                count = 0
+            else: 
+                pass
 
 
 def comparenotes(frequency): 
@@ -123,8 +130,9 @@ def get_duration(count):
     durations["half"] = durations["whole"] /2 
     durations["quarter"] = durations["whole"]/4
     durations["eighth"] = durations["whole"]/8
-    durations["sixteenth"] = durations["whole"]/16
+    durations["16th"] = durations["whole"]/16
     durations["32nd"] = durations["whole"]/32
+    durations["64th"] = durations["whole"]/64
     
     for note in durations: 
         if abs(time-durations[note]) < min:
@@ -132,6 +140,8 @@ def get_duration(count):
             min = abs(time-durations[note])
     return closestnote
 
+
+##!
 def Spectrogram(stft): 
     # Plot Frequency Spectrum (STFT Spectrogram) with Log Scaling
     plt.figure(figsize=(10, 6))
@@ -148,6 +158,33 @@ def Spectrogram(stft):
     plt.tight_layout()
     plt.show()
     
+def showSTFT(): 
+    data = []
+    for time_idx, time in enumerate(times):
+        if time_idx == 0 or time_idx == len(times) - 1:
+            continue
+        
+        #loop through timeindex and next time index and get all the amplitudes
+        time_amplitudes_cur = amplitudes[:, time_idx]
+        #get top two significant frequencies indicies
+        top_indices_cur = np.argsort(time_amplitudes_cur)[-2:] 
+        
+        
+
+        # Compare top frequencies based on indices and apply tolerance
+        freq_cur = frequencies[top_indices_cur[1]]
+        amp_cur = time_amplitudes_cur[top_indices_cur[1]]
+        data[time_idx].append(time, freq_cur, amp_cur)
+    
+    # plot
+    fig, ax = plt.subplots()
+    for time, freq, amp in data:
+        ax.scatter(time, freq, s=amp, c='blue', alpha=0.5)
+    ax.set(xlim=(0, 8), xticks=np.arange(1, 8),
+    ylim=(0, 8), yticks=np.arange(1, 8))
+    plt.show()
+
+        
 
 
 #####!!!!! Music 21 creation
@@ -163,7 +200,12 @@ def makesheetmusic(score):
         note_ = data[1]
         duration = data[2]
         time = data[3]
-        s.append(create_note(note_, duration))
+        if note_ == "rest":
+            rest = note.Rest()
+            rest.duration.type = duration
+            s.append(rest)
+        else:
+            s.append(create_note(note_, duration))
     return s
         
         
@@ -220,83 +262,4 @@ print(score)
 # print(f"MusicXML file saved to {output_path}")
 
 
-##? Find clef code
-            
-def findDistance(note1, note2): 
-    distance = 0
-    #*not accounting for # or flats
-    n1_letter_val  = ord(note1[0])
-    n1_octave  = int(note1[1])
-    n2_letter_val  = ord(note2[0])
-    n2_octave  = int(note2[1])
-    
-    distance = np.abs(n1_letter_val - n2_letter_val) + 8 * np.abs(n1_octave - n2_octave)
-    
-    
-    # print("Letter B: ", n1_letter_val, " Octave: ", n1_octave)
-    # print("Letter C: ", n2_letter_val, " Octave: ", n2_octave)
-    # print("Distance: ", distance)
-    return distance
-
-def findClef(score): 
-    clefs = {
-        "treble": "B5",
-        "bass": "D3",
-        "alto": "C4"
-    }
-    measure = 0
-    min = 9999999999999
-    closestClef = ""
-    for clef in clefs: 
-        middlenote = clefs[clef]
-        for data in score:
-            distance = findDistance(data[1], middlenote)
-            #* emphasize close notes more
-            measure += math.exp(distance)
-        
-        if measure <= min: 
-            min = measure
-            closestClef = clef
-    return closestClef
-
-
-def findKeySignature(): 
-    keySignatures = { 
-        # Key Signatures in the Treble Clef
-        "C Major": ["C", "D", "E", "F", "G", "A", "B"],  # No sharps or flats
-        "G Major": ["G", "A", "B", "C", "D", "E", "F#"],  # One sharp (F#)
-        "D Major": ["D", "E", "F#", "G", "A", "B", "C#"],  # Two sharps (F#, C#)
-        "A Major": ["A", "B", "C#", "D", "E", "F#", "G#"],  # Three sharps (F#, C#, G#)
-        "E Major": ["E", "F#", "G#", "A", "B", "C#", "D#"],  # Four sharps (F#, C#, G#, D#)
-        "B Major": ["B", "C#", "D#", "E", "F#", "G#", "A#"],  # Five sharps (F#, C#, G#, D#, A#)
-        "F# Major": ["F#", "G#", "A#", "B", "C#", "D#", "E#"],  # Six sharps (F#, C#, G#, D#, A#, E#)
-        "C# Major": ["C#", "D#", "E#", "F#", "G#", "A#", "B#"],  # Seven sharps (F#, C#, G#, D#, A#, E#, B#)
-        "F Major": ["F", "G", "A", "Bb", "C", "D", "E"],  # One flat (Bb)
-        "Bb Major": ["Bb", "C", "D", "Eb", "F", "G", "A"],  # Two flats (Bb, Eb)
-        "Eb Major": ["Eb", "F", "G", "Ab", "Bb", "C", "D"],  # Three flats (Bb, Eb, Ab)
-        "Ab Major": ["Ab", "Bb", "C", "Db", "Eb", "F", "G"],  # Four flats (Bb, Eb, Ab, Db)
-        "Db Major": ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"],  # Five flats (Bb, Eb, Ab, Db, Gb)
-        "Gb Major": ["Gb", "Ab", "Bb", "Cb", "Db", "Eb", "F"],  # Six flats (Bb, Eb, Ab, Db, Gb, Cb)
-        "Cb Major": ["Cb", "Db", "Eb", "Fb", "Gb", "Ab", "Bb"],  # Seven flats (Bb, Eb, Ab, Db, Gb, Cb, Fb
-                     }
-    
-    for key_sig in keySignatures:
-        count = 0
-        min = 999
-        bestKey = ""
-        for data in score: 
-            note = data[1]
-            note_name = note[0]
-            #print(note_name)
-            if note_name not in keySignatures[key_sig]: 
-                count += 1 
-        if count <= min: 
-            bestKey = key_sig
-        
-    return bestKey
-                                                                                                         
-print("Closest Clef: ", findClef(score))
-print("Key Signature: ", findKeySignature())
-
-
-            
+showSTFT()
