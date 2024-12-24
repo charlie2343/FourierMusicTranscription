@@ -88,8 +88,8 @@ def filter():
     
 
 
-filter()
-Spectogram()
+#filter()
+#Spectogram()
 Signal()
 
 

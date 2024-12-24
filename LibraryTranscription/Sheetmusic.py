@@ -51,6 +51,31 @@ def short_time_fourier_transform(signal, overlap=0.25):  # Get the window for th
     f, t, Zxx = stft(signal, SAMPLING_RATE, window=window, nperseg=nperseg, noverlap=noverlap)
     return f, t, Zxx
 
+def comparenotes(frequency): 
+    min = 999
+    currnote = ""
+    for note in oct4notes: 
+        if abs(frequency - oct4notes[note]) <= min: 
+            min = abs(frequency - oct4notes[note])
+            currnote = note
+    return currnote
+
+def filterTopFrequency(frequencies, times, Zxx, threshold): 
+    top_frequencies = []
+    for time_idx, time in enumerate(times):
+        freq_amplitudes = np.abs(Zxx[:, time_idx])
+        top_index = np.argsort(freq_amplitudes)[-1:]
+        if freq_amplitudes[top_index] < threshold:
+            top_frequencies.append("rest")
+        else: 
+            top_frequencies.append(comparenotes(frequencies[top_index]))
+        
+        #print(f"Time: {time:.2f}s")
+        # for freq, amp in zip(frequencies[top_indices], time_amplitudes[top_indices]):
+        #     print(f"Top frequency: {freq:.2f} Hz, Amplitude: {amp:.2f}")
+    return top_frequencies
+        
+
 
 
 def getnotes():
@@ -112,14 +137,7 @@ def getnotes():
                 pass
 
 
-def comparenotes(frequency): 
-    min = 999
-    currnote = ""
-    for note in oct4notes: 
-        if abs(frequency - oct4notes[note]) <= min: 
-            min = abs(frequency - oct4notes[note])
-            currnote = note
-    return currnote
+
     
 def get_duration(count): 
     min = 10
@@ -260,6 +278,4 @@ print(score)
 # output_path = os.path.expanduser(f'~/Fourier/scores/{name}')  # Expand `~` to the home directory
 # Music.write('musicxml', fp=output_path)
 # print(f"MusicXML file saved to {output_path}")
-
-
-showSTFT()
+filterTopFrequency(frequencies,times,np.abs(stft_result))
