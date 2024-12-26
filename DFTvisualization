@@ -1,0 +1,28 @@
+import cmath 
+import numpy as np
+n = 1024
+w = cmath.exp (-2j * cmath.pi/n)
+
+
+matrix =[]
+for i in range (n):
+    row = []
+    for j in range (n):
+        row.append (w ** (i*j))
+    matrix.append(row)
+for i in range (n):
+    for j in range(n): 
+        matrix[i][j] = matrix[i][j].real
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Create data for the colormap
+data = np.linspace(0, 1, 100).reshape(10, 10)
+
+# Display the colormap
+plt.imshow(matrix, cmap="plasma", interpolation="nearest")
+plt.colorbar()  # Add a color scale
+plt.title("DFT matrix Visulaization")
+plt.show()

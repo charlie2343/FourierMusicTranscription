@@ -11,7 +11,7 @@ import os
 
 
 ##!!WINDOW calculation
-SAMPLING_RATE, signal = read('mhll.wav')
+SAMPLING_RATE, signal = read('JingleBells.wav')
 # Convert to mono if stereo
 if len(signal.shape) > 1:
     signal = signal.mean(axis=1)
@@ -58,13 +58,17 @@ def comparenotes(frequency):
 
 def filterTopNotes(frequencies, times, Zxx, threshold): 
     top_notes = []
+    top_freq_amplitudes = []
     for time_idx, time in enumerate(times):
         freq_amplitudes = np.abs(Zxx[:, time_idx])
         top_index = np.argsort(freq_amplitudes)[-1:]
+
+        top_freq_amplitudes.append(freq_amplitudes[top_index])
         if freq_amplitudes[top_index] < threshold:
             top_notes.append("rest")
         else: 
             top_notes.append(comparenotes(frequencies[top_index]))
+    print("top_freq amps: ", top_freq_amplitudes)
     return top_notes
 
 BPM = 60
@@ -103,6 +107,10 @@ def makeScore():
         else: 
             score.append((cur_note, get_duration(count)))
             count = 0
+    for data in score: 
+            note = data[0]
+            if note == '':
+                score.remove(data)
     return score
 
 print("Score: ", makeScore())
@@ -150,5 +158,6 @@ name = input("Enter file name (without extension): ").strip()  # Remove extra sp
 output_path = os.path.expanduser(f'~/Fourier/scores/{name}')  # Expand `~` to the home directory
 Music.write('musicxml', fp=output_path)
 print(f"MusicXML file saved to {output_path}")
+
 
 #Signal()
